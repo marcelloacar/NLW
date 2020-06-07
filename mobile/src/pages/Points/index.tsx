@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Constants from 'expo-constants';
 import { Feather as Icon } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { SvgUri } from 'react-native-svg';
@@ -23,14 +23,22 @@ interface Point {
   longitude: number;
 }
 
+interface Params {
+  uf: string;
+  city: string;
+}
+
 const Points = () => {
-  const [items, setItems] = useState<Item[]>();
-  const [points, setPoints] = useState<Point[]>();
+  const [items, setItems] = useState<Item[]>([]);
+  const [points, setPoints] = useState<Point[]>([]);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
 
   const[initialPosition, setInitialPosition] = useState<[number, number]>([0, 0]);
 
   const navigation = useNavigation();
+  const route = useRoute();
+
+  const routeParams = route.params as Params;
 
   useEffect(() => {
     async function loadPosition() {
@@ -41,9 +49,9 @@ const Points = () => {
         return;
       }
 
-      const location = Location.getCurrentPositionAsync();
+      const location = await Location.getCurrentPositionAsync();
 
-      const { latitude, longitude } = (await location).coords;
+      const { latitude, longitude } = location.coords;
 
       setInitialPosition([
         latitude,
@@ -63,21 +71,21 @@ const Points = () => {
   useEffect(() => {
     api.get('points', {
       params: {
-        city: 'São Paulo',
-        uf: 'SP',
-        items: [1, 2, 3, 4, 5, 6]
+        city: routeParams.city,
+        uf: routeParams.uf,
+        items: selectedItems
       }
     }).then(response => {
       setPoints(response.data);
     });
-  }, []);
+  }, [selectedItems]);
 
   function handelNavigateBack() {
     navigation.goBack();
   };
 
-  function handelNavigateToDetail() {
-    navigation.navigate('Detail');
+  function handelNavigateToDetail(id: number) {
+    navigation.navigate('Detail', { point_id: id });
   }
 
   function handleSelectItem(id: number) {
@@ -89,7 +97,7 @@ const Points = () => {
     } else {
         setSelectedItems([ ...selectedItems, id]);
     }
-}
+  }
 
   return (
     <>
@@ -105,7 +113,6 @@ const Points = () => {
           { initialPosition[0] !== 0 && (
             <MapView 
               style={styles.map}
-              loadingEnabled={ initialPosition[0] === 0 }
               initialRegion={{ 
                 latitude: initialPosition[0],
                 longitude: initialPosition[1],
@@ -113,10 +120,10 @@ const Points = () => {
                 longitudeDelta: 0.014
               }} 
             >
-              { points?.map(point => (
+              { points.map(point => (
                 <Marker key={String(point.id)}
                   style={styles.mapMarker}
-                  onPress={handelNavigateToDetail}
+                  onPress={() => handelNavigateToDetail(point.id)}
                   coordinate={{ 
                     latitude: point.latitude,
                     longitude: point.longitude
@@ -141,7 +148,7 @@ const Points = () => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 20 }}
         >
-          {items?.map(item => (
+          {items.map(item => (
             <TouchableOpacity 
               key={String(item.id)} 
               style={[
